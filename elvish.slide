@@ -1,0 +1,291 @@
+Elvish
+A new, experimental Unix shell
+16:45 25 May 2014
+
+Cheer Xiao
+Undergraduate, Tsinghua University
+xiaqqaix@gmail.com
+
+* Unix shells you may know
+
+1971 Thompson shell
+
+- Pipeline, command redirection
+
+1977 bourne shell
+
+- Control flow, variables, signal handling, async command, command substitution, ...
+
+1978 csh
+
+- History substitution, alias, directory stack, tilde notation, filename completion, cdpath, job control
+
+1983 ksh
+
+- bourne shell + csh interactive features; Line editor, Associate array, float arithmetics
+
+1989 ash
+
+- A lightweight clone of bourne shell
+
+* Unix shells you know
+
+1989 [[https://www.gnu.org/software/bash/][bash]]
+
+- "Bashing" features of ksh and csh, plus a lot of obscure ones...
+
+1990 [[http://zsh.sourceforge.net/][zsh]]
+
+- The goal seems to be "support everything":
+
+  $ echo $COLUMNS
+  84
+  $ man zshall | wc -l; man bash | wc -l; man dash | wc -l
+  26518
+  5593
+  1556
+
+* Unix shells you may not know
+
+1989 [[http://plan9.bell-labs.com/magic/man2html/1/rc][rc]]: The plan 9 shell
+
+1993 es: rc with higher order functions
+
+1994 [[http://scsh.net/][scsh]]: Scheme shell
+
+1999 [[http://gnp.github.io/psh/][psh]]: Perl shell
+
+2005 [[http://fishshell.com/][fish]]
+
+- "Customizability is the root of all evil"
+- Modern interactive features
+- Cleaner scripting
+
+* Why another shell? - Part 1
+
+With bash and zsh we are still stuck in the 1990s
+
+- Obscure syntax; double quotes everywhere
+    # print all elements in xs that start with "-"
+    for x in "$xs[@]"; do
+        if test "$x" != "${x#-}"; then
+            printf '%s\n' "$x"
+        fi
+    done
+- Weak expressive power (fortunately we have `eval`)
+- No package or namespace or whatever, *in*2014*
+- Obscure configurations and unusable defaults
+
+* Why another shell? - Part 1 cont.
+
+Behold:
+
+#.image http://shreevatsa.files.wordpress.com/2008/03/bashstartupfiles1.png
+.image bashstartupfiles.png 489 512
+
+* Why another shell? - Part 2
+
+Problems with more recent shells
+
+- rc and es are pretty clean, but still too primitive (and dead)
+- scsh is not shell-ish (and dead)
+- psh is based on the wrong language (and dead)
+- fish is still too "conventional"
+
+* What defines a shell?
+
+A shell is anything that wraps the kernel.
+
+In Unix "shell" has taken a few more connotations:
+
+- CLI, maybe with some TUI (or rather, lack of GUI)
+- Delegates specialized work to external commands
+- Pipeline
+
+* Introducing Elvish
+
+[[https://github.com/xiaq/elvish]]
+
+- Started in Jun 2013
+- Development has been slow but never stagnant
+- In golang
+
+Goals
+
+- A simple, smart terminal interface
+- *And* a decent programming language
+
+Notes
+
+- Some features to be demonstrated may be broken in HEAD
+- Some may not even have been implemented
+
+* It's not that revolutionary...
+
+The following works as expected:
+
+    > vim README.md
+    ...
+    > ls -lR > ls-lR
+    > cat -v /dev/random
+    ...
+    > dmesg | grep bar
+    ...
+
+* Arithmetics
+
+I hate to choose between `octave` and `ipython` when I need a simple calculator
+
+    > - 57.52 47.94
+    9.58
+    > * $ans 0.69
+    6.6102
+    > / 1 0
+    +Inf
+    > > (det [[5 7] [7 8]]) 0 # det is previously defined
+    true
+
+(Note how `>` is reused as a command name.)
+
+* String
+
+String literals
+
+- Backquote for raw string,  Double quote for C-style string
+- Single quotes and `\` outside double quotes are not special (yet)
+- Bareword are also string literals
+- There is no interpolation, use implicit concatenation
+
+    > println `````He's dead, Jim."`
+    ``He's dead, Jim."
+    > println "a\x40\nb"
+    a@
+    b
+    > println '\n'
+    '\n'
+    > = a `a`
+    true
+    > println `My pid is `$pid
+    6003
+
+* Table
+
+A hybrid of array and hash table, a la Lua
+
+    > println [a b c &key value]
+    [a b c &key value]
+    > println [a b c &key value][0]
+    a
+    > println [a b c &key value][key]
+    value
+
+A special `$env` table exposes environmental variables
+
+    > println $env[EDITOR]` is obviously the best editor`
+    vim is obviously the best editor
+
+(Tables may see some rework as I add static typing.)
+
+* Variables
+
+Declare with `var` before use, like Javascript
+
+    > var $v
+    > set $v = [foo bar]
+    > var $u = [foo bar] # shorthand for a var-set combo
+
+Avoiding the declaration/assignment ambiguity in Python:
+
+    x = 1
+    if True:
+        x = 2 # assignment
+    def f():
+        x = 2 # declaration
+
+* Closure and functional programming
+
+map and filter:
+
+    > map {|x| * 2 $x} [1 2 3]
+    [2 4 6]
+    > filter {|x| > $x 2} [1 2 3 4 5]
+    [3 4 5]
+
+Use `()` to capture the output of a command. This makes for lisp-y FP:
+
+    > map {|x| * 2 $x} (filter {|x| > $x 2} [1 2 3 4 5])
+    [6 8 10]
+
+* Pipeline
+
+Use pipelines to get rid of lots of irritating superfluous parentheses:
+
+    > put [1 2 3 4 5] | filter {|x| > $x 2} | map {|x| * 2 $x}
+    [6 8 10]
+
+Pecularities
+
+- Pipelines may convey Elvish objects *or* raw bytes
+- Builtins and functions within a pipeline are executed in the same process
+
+* Elvish is quite static
+
+Each line of source is _compiled_ into a (golang) closure
+
+- Resolve varialbes statically - No `locals()` as in Python or `_ENV` as in Lua, sorry
+- Resolve the underlying mechanism of the _pipes_ statically - remember pipes may convey Elvish objects *or* raw bytes
+
+Instead of complaining about nonexistent variable, the following source won't *compile*:
+
+    # Assume there was no `var $a`
+    put $a
+
+Neither will this:
+
+    # filter requires input pipe to convey Elvish objects
+    echo haha | filter {|x| * 2 $x}
+
+* Elvish will be a bit more static
+
+In future
+
+- Static typing for variables
+- Static typing for _Elvish_object_pipes_
+
+Challenges
+
+- Choose a type inference mechanism (HM or local inference?)
+- Choose a polymorphism mechanism
+
+* Interactive features
+
+Syntax highlighting, right-hand-side prompt, completion, navigation mode
+
+.image completion.png
+
+.image navigation.png
+
+* Implementation
+
+Go
+
+- Resonably simple - [[http://golang.org/ref/spec][spec]] good for an afternoon's read; makes for very readable code
+- `go`get` and [[http://godoc.org/][godoc]]
+
+A little-known secret: Go actually sucks
+
+- No generics yet (type assertion over `interface{}` is ugly)
+- Golang `interface` is not the most expressive polymorphism mechanism
+- ... but I find it actually bearable most of the time
+
+* Project status
+
+Certainty not production-ready
+
+- Certain aspects not even designed (see [[https://github.com/xiaq/elvish/blob/master/TODO.md]])
+- May destroy your `$HOME`, don't post this on HN yet :)
+
+Contributions welcome
+
+- [[https://github.com/xiaq/elvish/issues]]
+- or [[https://waffle.io/xiaq/elvish]]

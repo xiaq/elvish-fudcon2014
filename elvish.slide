@@ -38,16 +38,16 @@ xiaqqaix@gmail.com
 
 - The goal seems to be "support everything":
 
-  $ echo $COLUMNS
-  84
-  $ man zshall | wc -l; man bash | wc -l; man dash | wc -l
-  26518
-  5593
-  1556
+    $ echo $COLUMNS
+    84
+    $ for x in zshall bash dash; do man $x | wc -l; done
+    26518
+    5593
+    1556
 
 * Unix shells you may not know
 
-1989 [[http://plan9.bell-labs.com/magic/man2html/1/rc][rc]]: The plan 9 shell
+1989 [[http://plan9.bell-labs.com/magic/man2html/1/rc][rc]]: The plan 9 shell, a rework of bourne shell
 
 1993 es: rc with higher order functions
 
@@ -55,11 +55,14 @@ xiaqqaix@gmail.com
 
 1999 [[http://gnp.github.io/psh/][psh]]: Perl shell
 
-2005 [[http://fishshell.com/][fish]]
+2005 [[http://fishshell.com/][fish]]: friendly interactive shell
 
+- Modern interactive features and cleaner scripting
 - "Customizability is the root of all evil"
-- Modern interactive features
-- Cleaner scripting
+
+2006 PowerShell (not actually a Unix shell)
+
+- Object pipeline, very systematic builtin functions
 
 * Why another shell? - Part 1
 
@@ -90,13 +93,14 @@ Problems with more recent shells
 - rc and es are pretty clean, but still too primitive (and dead)
 - scsh is not shell-ish (and dead)
 - psh is based on the wrong language (and dead)
-- fish is still too "conventional"
+- fish is still too conservative (and written in C++)
+- PowerShell is complicated and has too much .NET (and is proprietary)
 
 * What defines a shell?
 
 A shell is anything that wraps the kernel.
 
-In Unix "shell" has taken a few more connotations:
+In Unix the word "shell" has taken a few more connotations:
 
 - CLI, maybe with some TUI (or rather, lack of GUI)
 - Delegates specialized work to external commands
@@ -120,9 +124,9 @@ Notes
 - Some features to be demonstrated may be broken in HEAD
 - Some may not even have been implemented
 
-* It's not that revolutionary...
+* It's still a Unix shell
 
-The following works as expected:
+The following works as expected (leading `>` represents the prompt):
 
     > vim README.md
     ...
@@ -142,7 +146,7 @@ I hate to choose between `octave` and `ipython` when I need a simple calculator
     6.6102
     > / 1 0
     +Inf
-    > > (det [[5 7] [7 8]]) 0 # det is previously defined
+    > > (det [[5 7] [7 8]]) 0 # supposing that det is previously defined
     true
 
 (Note how `>` is reused as a command name.)
@@ -178,6 +182,11 @@ A hybrid of array and hash table, a la Lua
     a
     > println [a b c &key value][key]
     value
+
+Argument list uses the same syntax; no more `--` (only applies to builtins and functions though)
+
+    > println a b c &sep ` 233 `
+    a 233 b 233 c
 
 A special `$env` table exposes environmental variables
 
@@ -220,20 +229,21 @@ Use `()` to capture the output of a command. This makes for lisp-y FP:
 
 Use pipelines to get rid of lots of irritating superfluous parentheses:
 
-    > put [1 2 3 4 5] | filter {|x| > $x 2} | map {|x| * 2 $x}
-    [6 8 10]
+    > put 1 2 3 4 5 | filter {|x| > $x 2} | map {|x| * 2 $x}
+    6 8 10
 
 Pecularities
 
 - Pipelines may convey Elvish objects *or* raw bytes
-- Builtins and functions within a pipeline are executed in the same process
+- Builtins and functions within a pipeline are executed in different *threads* within the same process
+- There is no "subshell"
 
 * Elvish is quite static
 
 Each line of source is _compiled_ into a (golang) closure
 
-- Resolve varialbes statically - No `locals()` as in Python or `_ENV` as in Lua, sorry
-- Resolve the underlying mechanism of the _pipes_ statically - remember pipes may convey Elvish objects *or* raw bytes
+- Varialbes are resolved statically - No `locals()` as in Python or `_ENV` as in Lua, sorry
+- The underlying transport of the _pipes_ is chosen statically - remember pipes may convey Elvish objects *or* raw bytes
 
 Instead of complaining about nonexistent variable, the following source won't *compile*:
 
@@ -269,7 +279,8 @@ Syntax highlighting, right-hand-side prompt, completion, navigation mode
 
 Go
 
-- Resonably simple - [[http://golang.org/ref/spec][spec]] good for an afternoon's read; makes for very readable code
+- Resonably simple ([[http://golang.org/ref/spec][spec]] good for an afternoon's read)
+- Results in very readable code
 - `go`get` and [[http://godoc.org/][godoc]]
 
 A little-known secret: Go actually sucks
@@ -278,12 +289,30 @@ A little-known secret: Go actually sucks
 - Golang `interface` is not the most expressive polymorphism mechanism
 - ... but I find it actually bearable most of the time
 
+* Challenges
+
+Syntax
+
+- Bareword is a must
+- Which leaves very few choices for special characters
+
+Semantics
+
+- Good interaction with external commands is a must
+- How `if` should work is not yet decided (boolean or "command success"?)
+- How error/exception handling should work is not yet decided
+
+Implementation
+
+- Not sure compiling to golang closure is a good idea (but it seems good enough for now)
+- AST is a bit clumsy to do in golang (AST is the most legitimate use case for class hierarchy, which golang rejects)
+
 * Project status
 
 Certainty not production-ready
 
-- Certain aspects not even designed (see [[https://github.com/xiaq/elvish/blob/master/TODO.md]])
-- May destroy your `$HOME`, don't post this on HN yet :)
+- Many features not yet implemented, certain aspects not even designed (see [[https://github.com/xiaq/elvish/blob/master/TODO.md][TODO]])
+- May destroy your `$HOME` in background, so don't post this on HN or reddit yet :)
 
 Contributions welcome
 
